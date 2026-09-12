@@ -1,4 +1,4 @@
-Web Guidelines
+# Web Guidelines
 
 Scope: web interfaces. Dimensions = CSS px unless specified; CSS px ≠ device pixels; native points ≠ CSS `pt`. `M` = requirement; `D` = default, justified exceptions allowed; `O` = optional treatment. These are project rules, not a claim that every preference is a standard. Accessibility, native behavior, and data integrity take precedence over visual preference. CSS/HTML snippets specify browser behavior; stack-specific implementation is in §16. References identify standards and API behavior, not a prescribed visual identity.
 
