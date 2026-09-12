@@ -1,6 +1,8 @@
-# Interface Engineering Guidelines
+Web Guidelines
 
 Scope: web interfaces. Dimensions = CSS px unless specified; CSS px ≠ device pixels; native points ≠ CSS `pt`. `M` = requirement; `D` = default, justified exceptions allowed; `O` = optional treatment. These are project rules, not a claim that every preference is a standard. Accessibility, native behavior, and data integrity take precedence over visual preference. CSS/HTML snippets specify browser behavior; stack-specific implementation is in §16. References identify standards and API behavior, not a prescribed visual identity.
+
+**M · Safety invariant:** Never bypass safety: no `any`/`Any`, unsafe casts/assertions, non-null/definite-assignment `!`, `@ts-ignore`, swallowed exceptions, ambiguous truthiness, shared mutable state/defaults, mutation of the iterated collection or its elements, exact floating-point equality, or unvalidated boundary input. Strict checks remain enabled; types stay precise. Fix the model, validation, or control flow, not the diagnostic. Applies to application code, tests, examples, and tooling; no visual, performance, or brevity exception.
 
 ## 1. Targets, touch, zoom
 
@@ -74,7 +76,9 @@ Scope: web interfaces. Dimensions = CSS px unless specified; CSS px ≠ device p
 
 ## 10. Contrast, themes, visual surfaces
 
-- **M · Web contrast ([text][contrast], [UI][nontext-contrast]):** WCAG 2.2 AA text ≥4.5:1; large text ≥3:1, where large = ≥24px regular or ≥18.667px bold; essential UI boundaries/graphics ≥3:1 against adjacent colors. Actual rendered backgrounds, gradients, translucency, hover/focus/selected states are tested. Supplemental perceptual contrast metrics never replace required WCAG checks.
+- **M · [APCA text contrast][apca]:** APCA guides perceptual text-color decisions; `Lc` is lightness contrast, not a ratio or percentage. Project targets: body text `|Lc| ≥75`, preferably `≥90`; non-body content `≥60` only at sufficient size/weight. Reference-font anchors at `Lc75`: `18px/400`, `16px/500`, `14px/700`; at `Lc60`: `24px/400`, `18px/600`, `16px/700`. Sizes are CSS px; weights require comparable stroke thickness and x-height, not merely the same CSS weight number. Actual font/use case meets the supported size/weight guidance; no blanket `Lc60` pass for small text. These are project readability requirements based on evolving APCA guidance, not WCAG thresholds.
+- **M · [APCA verification][apca-testing]:** version-pinned APCA-W3-compatible tooling evaluates supported color-space inputs; non-sRGB colors are converted correctly, not reinterpreted as sRGB channel values. Foreground and actual composited background retain their order; light-on-dark returns negative `Lc`; thresholds compare `Math.abs(Lc)`. Swapping colors requires recalculation. Test every theme/state and the lowest-contrast background beneath text on gradients/images. Evidence records foreground/background, font size/weight, signed `Lc`, target, and tool/version; no unmeasured accessibility claim.
+- **M · WCAG contrast ([text][contrast], [UI][nontext-contrast]):** WCAG 2.2 AA text ≥4.5:1; large text ≥3:1, where large = ≥24px regular or ≥18.667px bold; essential UI boundaries/graphics ≥3:1 against adjacent colors. Actual rendered backgrounds, gradients, translucency, hover/focus/selected states are tested. APCA guides readability; WCAG conformance is checked separately. A passing APCA score never excuses a failed required WCAG check.
 - **M · Redundancy:** state/error/chart meaning is not color-only; text, shape, pattern, icon, or position carries equivalent meaning. Charts use distinguishable palettes plus labels/legend and accessible information. Interactive states remain obvious; extra contrast is the default, not permission to reduce baseline readability.
 - **D · Semantic color:** semantic system colors retain their intended roles and adapt to appearance; no copying a light-mode RGB value as a universal token. Custom palettes cover light/dark × normal/increased contrast; test real bright/dim environments. Color meaning stays consistent and culturally appropriate; noninteractive text does not misleadingly reuse interactive styling.
 - **M · Browser theme:** document `color-scheme` matches actual supported/current appearance; native widgets and scrollbars remain legible; `theme-color` follows page chrome/background where supported. Theme changes suppress unrelated hover/layout transitions and do not strand elements in animation states. SVG favicon may use internal `prefers-color-scheme` styling.
@@ -131,8 +135,11 @@ Scope: web interfaces. Dimensions = CSS px unless specified; CSS px ≠ device p
 
 ### TypeScript
 
-- **M · [Types][ts-strict]:** `strict:true`; external/untrusted data starts as `unknown` and is validated at runtime before it drives UI. A cast or declared response type is not validation. Props preserve native semantics, refs, labels, and event types; no `any`, non-null assertion, or unsafe cast merely to silence a design-state error.
-- **M · [State models][ts-narrowing]:** finite variants use literal unions, e.g. `type Tone='primary'|'secondary'|'danger'`; async views use discriminated states, e.g. `{status:'pending'}` or `{status:'success';data:T}`. Impossible combinations are unrepresentable; error states include usable recovery data. Absent data is not an empty-success state. Components expose needed focus/disabled/busy behavior, not only appearance.
+- **M · [Strict checks][ts-strict]:** `strict:true`, [`noUncheckedIndexedAccess:true`][ts-indexed], [`exactOptionalPropertyTypes:true`][ts-optional]; no strict-family override to `false`, including [`useUnknownInCatchVariables`][ts-catch]. Existing stronger checks stay enabled. No diagnostic suppression, skipped check, or relaxed lint/tsconfig rule to make failing code pass. Replace unsafe assertions with validated narrowing; `as unknown as T`, `value!`, and `field!:T` are not fixes.
+- **M · Precise types and [narrowing][ts-narrowing]:** boundary input starts as `unknown`; validate API/JSON, URL, storage, environment, form, file, and message input before use. Check structure and domain constraints; invalid input yields an explicit error, not a cast or invented default. Declared types/generics do not validate runtime data. Conditions express intent: `value === undefined`, `value === null`, `text.length > 0`; `if(flag)` requires `flag:boolean`. Missing-value fallback uses `??`, not `||`, when `0`, `false`, or `''` is valid.
+- **M · Errors:** caught values remain `unknown` until narrowed, e.g. `error instanceof Error`. Recover explicitly or propagate with the original cause; no empty catches, fabricated success, or log-and-continue after failure. Await/return promises or attach deliberate rejection handling; discarding a promise is not error handling. Expected cancellation receives explicit treatment, not a blanket catch.
+- **M · [State models][ts-narrowing] and ownership:** variants use literal unions, e.g. `type Tone='primary'|'secondary'|'danger'`; async states use discriminated unions, e.g. `{status:'pending'}` or `{status:'success';data:T}`. Impossible combinations are unrepresentable; failure carries recovery data; absence ≠ empty success. Exhaustive branches use checked `never`, not `as never`. Shared values are immutable; updates produce new values; mutable defaults are fresh per call/instance, including nested members. Iteration derives a new collection without mutating the source or its elements. Props preserve native semantics, refs, labels, precise event types, and focus/disabled/busy behavior.
+- **M · [Numeric correctness][float-comparison]:** no exact floating-point equality. For finite, range-checked operands, compare with domain-derived absolute/relative tolerances: `Math.abs(a-b) <= Math.max(absTol,relTol*Math.max(Math.abs(a),Math.abs(b)))`; tolerances are finite, nonnegative, and appropriate to the units/magnitude. `Number.EPSILON` is not a universal tolerance. Exact decimal domains use decimal arithmetic or safely ranged integer units; validated safe-integer IDs/counts retain exact equality.
 
 ### Vite+
 
@@ -155,6 +162,8 @@ Linked standards/API documentation support the requirements and implementation a
 [tooltip]: https://www.w3.org/WAI/ARIA/apg/patterns/tooltip/
 [reflow]: https://www.w3.org/WAI/WCAG22/Understanding/reflow.html
 [text-spacing]: https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html
+[apca]: https://git.apcacontrast.com/documentation/APCA_in_a_Nutshell.html
+[apca-testing]: https://www.readtech.org/ARC/tests/bronze-simple-mode/
 [contrast]: https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html
 [nontext-contrast]: https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html
 [reduced-motion]: https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-reduced-motion
@@ -177,3 +186,7 @@ Linked standards/API documentation support the requirements and implementation a
 [label-in-name]: https://www.w3.org/WAI/WCAG22/Understanding/label-in-name.html
 [error-suggestion]: https://www.w3.org/WAI/WCAG22/Understanding/error-suggestion.html
 [vp-run]: https://viteplus.dev/guide/run
+[ts-indexed]: https://www.typescriptlang.org/tsconfig/noUncheckedIndexedAccess.html
+[ts-optional]: https://www.typescriptlang.org/tsconfig/exactOptionalPropertyTypes.html
+[ts-catch]: https://www.typescriptlang.org/tsconfig/useUnknownInCatchVariables.html
+[float-comparison]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/EPSILON
